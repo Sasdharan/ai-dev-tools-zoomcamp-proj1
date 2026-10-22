@@ -1,12 +1,11 @@
 # Personal Expense Tracker
 
-Personal Expense Tracker that allows import/export and track SMS transaction from on SMS
+Personal Expense Tracker that allows import/export and track transaction from on SMS
 
 🚀 Motivation
 
 - **This project was born out of a personal need when the expense tracker app I relied on reached its end-of-life and lost official support.**
-- Instead of just looking for a commercial replacement, I used this as an opportunity to build my own solution.
-- Developed as part of my Zoomcamp project, this application directly addresses the real-world challenges of tracking personal finances while serving as a hands-on implementation of production-grade data engineering practices.
+- Instead of just looking for a commercial replacement, I used this as an opportunity to build my own solution, as part of my Zoomcamp project.
 
 ## Features
 
