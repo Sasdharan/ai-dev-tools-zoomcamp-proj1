@@ -1,0 +1,122 @@
+name: Deploy
+
+# CD: after CI passes on main, publish images tagged with the commit SHA,
+# deploy them to dev automatically, then to prod after manual approval
+# (GitHub Environment "production" with required reviewers).
+# Rollback: run this workflow manually with an earlier commit SHA.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Commit SHA of previously published images to deploy (rollback); empty builds the current commit
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/sasdharan/ai-dev-tools-zoomcamp-proj1
+
+jobs:
+  publish:
+    name: Publish images
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Resolve image tag
+        id: tag
+        run: echo "tag=${INPUT_TAG:-${RUN_SHA:-$GITHUB_SHA}}" >> "$GITHUB_OUTPUT"
+        env:
+          INPUT_TAG: ${{ inputs.image_tag }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/checkout@v4
+        if: inputs.image_tag == ''
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+      - uses: docker/login-action@v3
+        if: inputs.image_tag == ''
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push images
+        if: inputs.image_tag == ''
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          for service in backend frontend; do
+            image="$IMAGE_PREFIX-$service"
+            docker build -f "$service/Dockerfile" -t "$image:$TAG" -t "$image:latest" .
+            docker push "$image:$TAG"
+            docker push "$image:latest"
+          done
+
+  deploy-dev:
+    name: Deploy to dev
+    needs: publish
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      url: ${{ vars.DEV_WEB_URL }}
+    steps:
+      - name: Trigger Render deploys
+        env:
+          TAG: ${{ needs.publish.outputs.tag }}
+          API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+          WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+        run: |
+          curl -fsS -X POST "$API_HOOK&imgURL=$IMAGE_PREFIX-backend:$TAG"
+          curl -fsS -X POST "$WEB_HOOK&imgURL=$IMAGE_PREFIX-frontend:$TAG"
+      - name: Wait for health check
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          sleep 60
+          for i in $(seq 1 40); do
+            curl -fsS "$API_URL/health" && exit 0
+            sleep 15
+          done
+          echo "Dev health check failed" >&2
+          exit 1
+
+  deploy-prod:
+    name: Deploy to production
+    needs: [publish, deploy-dev]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.PROD_WEB_URL }}
+    steps:
+      - name: Trigger Render deploys
+        env:
+          TAG: ${{ needs.publish.outputs.tag }}
+          API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+          WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+        run: |
+          curl -fsS -X POST "$API_HOOK&imgURL=$IMAGE_PREFIX-backend:$TAG"
+          curl -fsS -X POST "$WEB_HOOK&imgURL=$IMAGE_PREFIX-frontend:$TAG"
+      - name: Wait for health check
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          sleep 60
+          for i in $(seq 1 40); do
+            curl -fsS "$API_URL/health" && exit 0
+            sleep 15
+          done
+          echo "Production health check failed" >&2
+          exit 1

@@ -1,0 +1,72 @@
+# Render Blueprint: dev and prod environments, each with a backend, frontend,
+# and PostgreSQL database. Images are built and pushed to GHCR by
+# .github/workflows/deploy.yml, which also triggers deploys via deploy hooks.
+services:
+  - type: web
+    name: expense-tracker-api-dev
+    runtime: image
+    plan: free
+    image:
+      url: ghcr.io/sasdharan/ai-dev-tools-zoomcamp-proj1-backend:latest
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: expense-tracker-db-dev
+          property: connectionString
+      - key: OTEL_SERVICE_NAME
+        value: personal-expense-tracker-api-dev
+
+  - type: web
+    name: expense-tracker-web-dev
+    runtime: image
+    plan: free
+    image:
+      url: ghcr.io/sasdharan/ai-dev-tools-zoomcamp-proj1-frontend:latest
+    healthCheckPath: /
+    autoDeploy: false
+    envVars:
+      # Public URL of expense-tracker-api-dev, e.g. https://expense-tracker-api-dev.onrender.com
+      - key: BACKEND_URL
+        sync: false
+
+  - type: web
+    name: expense-tracker-api-prod
+    runtime: image
+    plan: free
+    image:
+      url: ghcr.io/sasdharan/ai-dev-tools-zoomcamp-proj1-backend:latest
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: expense-tracker-db-prod
+          property: connectionString
+      - key: OTEL_SERVICE_NAME
+        value: personal-expense-tracker-api-prod
+
+  - type: web
+    name: expense-tracker-web-prod
+    runtime: image
+    plan: free
+    image:
+      url: ghcr.io/sasdharan/ai-dev-tools-zoomcamp-proj1-frontend:latest
+    healthCheckPath: /
+    autoDeploy: false
+    envVars:
+      # Public URL of expense-tracker-api-prod, e.g. https://expense-tracker-api-prod.onrender.com
+      - key: BACKEND_URL
+        sync: false
+
+databases:
+  - name: expense-tracker-db
+    plan: free
+    databaseName: expense_tracker_dev
+    user: expense_tracker_dev
+
+  - name: expense-tracker-db
+    plan: free
+    databaseName: expense_tracker_prod
+    user: expense_tracker_prod

@@ -178,8 +178,60 @@ Alembic migrations.
 
 GitHub Actions workflows live in `.github/workflows/`:
 
-- `ci.yml` - backend lint (ruff) and tests (pytest), plus frontend build.
+- `ci.yml` - backend lint (ruff) and tests (pytest), plus frontend build, on
+  every pull request and push to `main`.
 - `docker.yml` - builds the backend and frontend Docker images.
+- `deploy.yml` - continuous deployment to Render:
+
+```text
+push to main -> CI (lint, tests, build)
+             -> publish images to GHCR tagged with the commit SHA
+             -> deploy to dev automatically + /health check
+             -> manual approval (GitHub Environment "production")
+             -> deploy the same images to production + /health check
+```
+
+### Rollback
+
+Run **Actions > Deploy > Run workflow** with `image_tag` set to the commit SHA
+of a previous good release. The workflow skips the build, redeploys those
+existing images to dev, and after approval to production. Render's
+**Rollback** button on a service is an alternative for a quick revert.
+
+## Deployment (Render)
+
+- Dev: `<dev frontend URL>`
+- Production: `<production frontend URL>`
+
+The app runs on [Render](https://render.com) as Docker images pulled from
+GHCR. [`render.yaml`](render.yaml) defines dev and prod environments, each with
+a backend web service, frontend web service, and PostgreSQL database. The
+backend image runs Alembic migrations on startup, then serves on Render's
+`PORT`. The frontend's nginx proxies `/api` to `BACKEND_URL`.
+
+One-time setup:
+
+1. Publish images once: run **Actions > Deploy** (or push to `main`) and,
+   in GitHub **Packages**, make both `ai-dev-tools-zoomcamp-proj1-backend` and
+   `-frontend` packages public (or add GHCR registry credentials in Render).
+2. In Render, create a **Blueprint** from this repository. Set each frontend's
+   `BACKEND_URL` to the public URL of the matching backend, e.g.
+   `https://expense-tracker-api-dev.onrender.com`.
+3. In GitHub **Settings > Environments**, create `development` and
+   `production`. Add required reviewers to `production`. In each environment
+   set:
+   - secrets `RENDER_DEPLOY_HOOK_API` and `RENDER_DEPLOY_HOOK_WEB` - the deploy
+     hook URLs of that environment's backend and frontend services (Render
+     service **Settings > Deploy Hook**);
+   - variables `API_URL` (backend public URL) and `DEV_WEB_URL` /
+     `PROD_WEB_URL` (frontend public URL).
+
+Free Render web services sleep when idle, so the first request after a pause
+may take about 30 seconds. Free Render PostgreSQL databases expire after 30
+days. The Grafana telemetry stack runs only with Docker Compose; on Render
+`OTEL_EXPORTER_OTLP_ENDPOINT` is unset and telemetry export is disabled.
+
+### Run workflows locally
 
 Run them locally with [act](https://github.com/nektos/act) (requires Docker; defaults are in `.actrc`):
 
