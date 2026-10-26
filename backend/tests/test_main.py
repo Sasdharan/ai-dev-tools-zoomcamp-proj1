@@ -1,3 +1,5 @@
+import csv
+import io
 from pathlib import Path
 
 import pytest
@@ -45,6 +47,7 @@ def test_app_generates_openapi_schema() -> None:
 
     assert schema["info"]["title"] == "Personal Expense Tracker API"
     assert "/api/v1/transactions" in schema["paths"]
+    assert "/api/v1/transactions/export" in schema["paths"]
     assert "/api/v1/transactions/import" in schema["paths"]
 
 
@@ -75,6 +78,44 @@ def test_create_and_list_transactions(client: TestClient) -> None:
     response = client.get("/api/v1/transactions")
     assert response.status_code == 200
     assert response.json()[0]["merchant"] == "Supermarket"
+
+
+def test_export_transactions_returns_documented_csv_and_escapes_values(
+    client: TestClient,
+) -> None:
+    client.post(
+        "/api/v1/transactions",
+        json={
+            "date": "2025-01-01T14:22:10",
+            "amount": "-45.50",
+            "merchant": 'Market, "Main"\nLocation',
+            "category": "Food",
+        },
+    )
+
+    response = client.get("/api/v1/transactions/export")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert (
+        response.headers["content-disposition"]
+        == 'attachment; filename="transactions.csv"'
+    )
+    rows = list(csv.reader(io.StringIO(response.text, newline="")))
+    assert rows == [
+        ["Date", "Amount", "Merchant", "Category"],
+        ["2025-01-01 14:22:10", "-45.50", 'Market, "Main"\nLocation', "Food"],
+    ]
+
+
+def test_export_transactions_with_no_saved_transactions_returns_header_only_csv(
+    client: TestClient,
+) -> None:
+    response = client.get("/api/v1/transactions/export")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert response.text == "Date,Amount,Merchant,Category\r\n"
 
 
 def test_create_transaction_rejects_invalid_input(client: TestClient) -> None:

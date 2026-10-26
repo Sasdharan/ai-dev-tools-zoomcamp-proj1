@@ -5,7 +5,15 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile, status
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -98,6 +106,32 @@ def list_transactions(
 ) -> list[Transaction]:
     statement = select(Transaction).order_by(Transaction.id)
     return list(database_session.scalars(statement).all())
+
+
+@app.get("/api/v1/transactions/export")
+def export_transactions(
+    database_session: Annotated[Session, Depends(get_db)],
+) -> Response:
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(("Date", "Amount", "Merchant", "Category"))
+
+    statement = select(Transaction).order_by(Transaction.id)
+    for transaction in database_session.scalars(statement):
+        writer.writerow(
+            (
+                transaction.date.isoformat(sep=" "),
+                str(transaction.amount),
+                transaction.merchant,
+                transaction.category,
+            )
+        )
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="transactions.csv"'},
+    )
 
 
 @app.post(

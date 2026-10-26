@@ -10,6 +10,20 @@ Personal Expense Tracker that allows import/export and track transaction from on
 ## Features
 
 - Allow CSV import/export
+- Export saved transactions as a CSV download from `GET /api/v1/transactions/export`
+- Use the CSV columns `Date,Amount,Merchant,Category`
+
+## Frontend
+
+The React/Vite frontend is a standalone starter page and does not require the API:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Create a production build with `npm run build`.
 
 ## Future implementation
 
