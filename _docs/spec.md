@@ -57,3 +57,9 @@ Provide basic summaries of transactions by month, category, and account. Include
 - AI-based categorization and external categorization services.
 - Offline editing and synchronization of queued changes.
 - Advanced budgeting, forecasting, or detailed analytics beyond the summaries above.
+
+## Operational readiness
+
+The observability and user-impact alerting scope is specified in
+[observability-alerting-spec.md](./observability-alerting-spec.md). An on-call
+agent remains out of scope.

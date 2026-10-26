@@ -20,10 +20,12 @@ Project stack and boundaries:
   in `/migrations`; do not create or alter tables at runtime
 - Ask before adding third-party dependencies
 - Keep secrets in `.env`; never hardcode or commit them
-- The React/Vite frontend is planned, not currently present. Do not assume
-  frontend files or behavior exist
-- SMS intake is planned. Check the FastAPI route definitions and OpenAPI
-  documentation before relying on a route or payload; do not invent one
+- The React/Vite frontend is present. Check its current files before assuming
+  a feature is implemented or exposed in the UI
+- SMS intake is out of scope for the current MVP and no webhook is implemented.
+  If a task requests SMS intake, check the FastAPI routes and OpenAPI
+  documentation, clarify the requested contract, and do not invent a route or
+  payload
 
 Setup and checks, when the relevant files are present:
 

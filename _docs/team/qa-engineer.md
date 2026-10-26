@@ -17,8 +17,8 @@ How to check:
   when the configured paths are present
 - Verify API behavior using tests or the FastAPI OpenAPI docs at `/docs` when
   available
-- Do not assume a frontend exists; the React/Vite frontend is planned, not
-  currently present
+- The React/Vite frontend is present. Verify the current UI and its behavior
+  rather than assuming backend endpoints are exposed in the frontend
 - Do not assume SMS intake exists; check the implemented FastAPI routes
   before testing or reporting its behavior
 - Treat hardcoded secrets or unapproved schema changes as failures
