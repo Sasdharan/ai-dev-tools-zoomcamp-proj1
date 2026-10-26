@@ -1,16 +1,23 @@
 import csv
 import io
+import json
+import logging
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import SpanKind
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from database import get_db
 from main import app
+from telemetry import REQUEST_LOGGER, meter_provider, metric_reader, tracer_provider
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -23,6 +30,13 @@ def client(tmp_path, monkeypatch):
     command.upgrade(config, "head")
 
     database_engine = create_engine(database_url)
+    SQLAlchemyInstrumentor().instrument(
+        engine=database_engine,
+        tracer_provider=tracer_provider,
+        meter_provider=meter_provider,
+        enable_commenter=False,
+        enable_attribute_commenter=False,
+    )
     test_session_factory = sessionmaker(
         autocommit=False,
         autoflush=False,
@@ -442,3 +456,120 @@ def test_import_rejects_empty_malformed_and_missing_header_files(
         assert response.status_code == 422
         assert response.json()["detail"]
         assert client.get("/api/v1/transactions").json() == []
+
+
+def test_transaction_telemetry_is_correlated_and_excludes_user_data(
+    client: TestClient,
+) -> None:
+    exporter = InMemorySpanExporter()
+    tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+    log_records: list[logging.LogRecord] = []
+
+    class CaptureHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            log_records.append(record)
+
+    capture_handler = CaptureHandler()
+    REQUEST_LOGGER.addHandler(capture_handler)
+    was_disabled = REQUEST_LOGGER.disabled
+    REQUEST_LOGGER.disabled = False
+    private_value = "PRIVATE_TRANSACTION_VALUE"
+    private_query = "PRIVATE_QUERY_VALUE"
+    try:
+        response = client.post(
+            "/api/v1/transactions",
+            json={
+                "date": "2025-01-01T14:22:10",
+                "amount": "-45.50",
+                "merchant": private_value,
+                "category": "Groceries",
+            },
+        )
+        assert response.status_code == 201
+
+        list_response = client.get(f"/api/v1/transactions?search={private_query}")
+        assert list_response.status_code == 200
+        assert client.get("/health").status_code == 200
+
+        spans = exporter.get_finished_spans()
+        assert not any("/health" in span.name for span in spans)
+        create_logs = [
+            record
+            for record in log_records
+            if getattr(record, "http_method", None) == "POST"
+        ]
+        assert create_logs, [
+            (record.name, record.getMessage(), record.__dict__)
+            for record in log_records
+        ]
+        create_log = create_logs[0]
+        create_trace_id = int(create_log.trace_id, 16)
+        create_trace_spans = [
+            span for span in spans if span.context.trace_id == create_trace_id
+        ]
+        server_spans = [
+            span for span in create_trace_spans if span.kind is SpanKind.SERVER
+        ]
+        database_spans = [
+            span for span in create_trace_spans if span.kind is SpanKind.CLIENT
+        ]
+        assert server_spans
+        assert database_spans
+        assert create_log.trace_id != "0" * 32
+        assert all(
+            span.attributes.get("http.route") == "/api/v1/transactions"
+            for span in server_spans
+        )
+
+        stream_handler = next(
+            handler
+            for handler in REQUEST_LOGGER.handlers
+            if isinstance(handler, logging.StreamHandler)
+        )
+        formatted_logs = [
+            json.loads(stream_handler.formatter.format(record))
+            for record in log_records
+        ]
+        assert all(log["trace_id"] for log in formatted_logs)
+        telemetry_content = (
+            repr([(dict(span.attributes), span.events) for span in spans])
+            + json.dumps(formatted_logs)
+            + repr(log_records)
+        )
+        assert private_value not in telemetry_content
+        assert private_query not in telemetry_content
+        assert "-45.50" not in telemetry_content
+
+        metrics_data = metric_reader.get_metrics_data()
+        assert metrics_data is not None
+        metric_names = [
+            metric.name
+            for resource_metrics in metrics_data.resource_metrics
+            for scope_metrics in resource_metrics.scope_metrics
+            for metric in scope_metrics.metrics
+        ]
+        assert "http.server.duration" in metric_names, metric_names
+        duration_metrics = [
+            metric
+            for resource_metrics in metrics_data.resource_metrics
+            for scope_metrics in resource_metrics.scope_metrics
+            for metric in scope_metrics.metrics
+            if metric.name == "http.server.duration"
+        ]
+        assert any(
+            point.count > 0
+            and point.attributes.get("http.method") == "POST"
+            and point.attributes.get("http.status_code") == 201
+            for metric in duration_metrics
+            for point in metric.data.data_points
+        )
+        assert private_query not in repr(
+            [
+                point.attributes
+                for metric in duration_metrics
+                for point in metric.data.data_points
+            ]
+        )
+    finally:
+        REQUEST_LOGGER.removeHandler(capture_handler)
+        REQUEST_LOGGER.disabled = was_disabled

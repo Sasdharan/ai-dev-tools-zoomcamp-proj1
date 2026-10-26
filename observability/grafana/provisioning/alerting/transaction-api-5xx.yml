@@ -1,0 +1,61 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: transaction-api
+    folder: Expense Tracker
+    interval: 30s
+    rules:
+      - uid: transaction-api-5xx
+        title: Transaction API returned a server error
+        condition: B
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              # The "unless ... offset" branch catches error series first seen in the window, which increase() reports as 0.
+              expr: sum((increase(http_server_duration_milliseconds_count{http_target=~"/api/v1/transactions.*",http_status_code=~"5.."}[5m]) > 0) or (http_server_duration_milliseconds_count{http_target=~"/api/v1/transactions.*",http_status_code=~"5.."} unless http_server_duration_milliseconds_count{http_target=~"/api/v1/transactions.*",http_status_code=~"5.."} offset 5m))
+              instant: true
+              range: false
+              refId: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  reducer:
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: A transaction API request returned HTTP 5xx.
+          description: One or more transaction API requests returned a server error in the last five minutes.
+        labels:
+          severity: warning

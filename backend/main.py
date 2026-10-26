@@ -18,8 +18,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from database import get_db
+from database import engine, get_db
 from models import Transaction
+from telemetry import configure_telemetry
 
 
 class TransactionInput(BaseModel):
@@ -103,6 +104,7 @@ def _map_csv_headers(headers: list[str]) -> dict[str, str]:
 
 
 app = FastAPI(title="Personal Expense Tracker API")
+configure_telemetry(app, engine)
 
 
 @app.get("/health")

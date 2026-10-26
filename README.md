@@ -20,19 +20,20 @@ local development, while Docker Compose runs the app with PostgreSQL.
 ## Run the application with Docker Compose
 
 Install Docker Compose, then create `.env` from `.env.example` only if `.env`
-does not already exist. Set `DATABASE_URL` in `.env` to the PostgreSQL service
-URL and make its password match `POSTGRES_PASSWORD`:
+does not already exist. Keep `DATABASE_URL` pointing at SQLite for local
+development; Compose ignores it and connects the backend to its PostgreSQL
+service using the `POSTGRES_*` settings in `.env`:
 
 ```dotenv
-DATABASE_URL=postgresql+psycopg2://expense_tracker:change-me-local@db:5432/expense_tracker
+DATABASE_URL=sqlite:///./expense_tracker.db
 POSTGRES_DB=expense_tracker
 POSTGRES_USER=expense_tracker
 POSTGRES_PASSWORD=change-me-local
 ```
 
-Replace the sample password with a private value in your local `.env`; do not
-commit `.env`. The URL must use the same database, username, and password as
-the PostgreSQL settings. Start the services from the repository root:
+Replace the sample password with a private, URL-safe value (letters, digits,
+`-`, `_`) in your local `.env`; do not commit `.env`. Start the services from
+the repository root:
 
 ```powershell
 docker compose --env-file .env up --build
@@ -59,8 +60,13 @@ restart the database:
 
 ```powershell
 docker compose --env-file .env stop db
-Invoke-WebRequest -Uri http://localhost:8000/api/v1/transactions -Method Get
-docker compose --env-file .env start db
+try {
+    Invoke-WebRequest -Uri http://localhost:8000/api/v1/transactions -Method Get
+} catch {
+    $_.Exception.Response.StatusCode
+} finally {
+    docker compose --env-file .env start db
+}
 ```
 
 The alert should fire after evaluation and return to normal once the 5-minute
@@ -156,3 +162,18 @@ details are intentionally undecided: there is currently no SMS webhook or
 payload contract. Keep the work behind tests for valid messages, invalid or
 ambiguous messages, and duplicate delivery; any schema changes must use
 Alembic migrations.
+
+## CI/CD
+
+GitHub Actions workflows live in `.github/workflows/`:
+
+- `ci.yml` - backend lint (ruff) and tests (pytest), plus frontend build.
+- `docker.yml` - builds the backend and frontend Docker images.
+
+Run them locally with [act](https://github.com/nektos/act) (requires Docker; defaults are in `.actrc`):
+
+```sh
+act --list
+act workflow_dispatch -W .github/workflows/ci.yml
+act workflow_dispatch -W .github/workflows/docker.yml
+```
