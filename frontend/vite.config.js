@@ -3,6 +3,9 @@ import { defineConfig, loadEnv } from "vite";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
+    esbuild: {
+      jsx: "automatic",
+    },
     server: {
       proxy: {
         "/api": {

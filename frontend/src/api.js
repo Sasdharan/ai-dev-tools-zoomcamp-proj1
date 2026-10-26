@@ -56,6 +56,10 @@ export function fetchTransactions() {
   return request("/api/v1/transactions");
 }
 
+export function fetchTransactionSummary() {
+  return request("/api/v1/transactions/summary");
+}
+
 export function updateTransaction(id, transaction) {
   return request(`/api/v1/transactions/${id}`, {
     method: "PUT",

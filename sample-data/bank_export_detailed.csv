@@ -1,0 +1,25 @@
+Transaction Date,Description,Expense Category,Amount,Currency,Account,Payment Method,Reference,Notes
+2025-03-01 09:00:00,Acme Corp Payroll,Salary,3200.00,USD,Checking,Direct Deposit,PAY-2025-03,March salary
+2025-03-02 18:20:45,Green Valley Market,Groceries,-82.35,USD,Checking,Debit Card,TXN-100231,"Weekly shop, incl. household items"
+2025-03-03 08:05:12,Metro Transit,Transport,-25.00,USD,Checking,Debit Card,TXN-100245,Monthly top-up
+2025-03-05 07:45:00,Sunrise Apartments,Rent,-1150.00,USD,Checking,Bank Transfer,RENT-0325,March rent
+2025-03-08 13:10:30,Bean There Cafe,Food & Drinks,-6.40,USD,Credit Card,Contactless,TXN-100302,
+2025-03-11 20:15:00,StreamFlix,Subscriptions,-15.99,USD,Credit Card,Recurring,SUB-SF-0311,Standard plan
+2025-03-14 11:30:00,City Power & Light,Utilities,-94.12,USD,Checking,Direct Debit,UTIL-0314,"Electricity, Feb usage"
+2025-03-19 19:42:18,Trattoria Roma,Dining,-48.90,USD,Credit Card,Credit Card,TXN-100377,"Dinner with friends, split 50/50"
+2025-03-27 16:00:00,Freelance Client - Design,Freelance,450.00,USD,Checking,Bank Transfer,INV-0042,Logo project
+2025-04-01 09:00:00,Acme Corp Payroll,Salary,3200.00,USD,Checking,Direct Deposit,PAY-2025-04,April salary
+2025-04-02 17:55:03,Green Valley Market,Groceries,-91.60,USD,Checking,Debit Card,TXN-100410,
+2025-04-04 08:12:44,Metro Transit,Transport,-25.00,USD,Checking,Debit Card,TXN-100422,Monthly top-up
+2025-04-05 07:45:00,Sunrise Apartments,Rent,-1150.00,USD,Checking,Bank Transfer,RENT-0425,April rent
+2025-04-09 12:25:10,Bean There Cafe,Food & Drinks,-7.80,USD,Credit Card,Contactless,TXN-100468,
+2025-04-11 20:15:00,StreamFlix,Subscriptions,-15.99,USD,Credit Card,Recurring,SUB-SF-0411,Standard plan
+2025-04-15 10:05:00,Wellness Pharmacy,Health,-23.45,USD,Credit Card,Credit Card,TXN-100499,"Prescription refill ""generic"""
+2025-04-18 14:30:00,Green Valley Market,Groceries,12.50,USD,Checking,Debit Card,RFND-100410,Refund for damaged item
+2025-04-22 21:03:27,Gadget Hub Online,Shopping,-129.99,USD,Credit Card,Online,TXN-100533,Wireless headphones
+2025-05-01 09:00:00,Acme Corp Payroll,Salary,3200.00,USD,Checking,Direct Deposit,PAY-2025-05,May salary
+2025-05-03 18:40:16,Green Valley Market,Groceries,-76.20,USD,Checking,Debit Card,TXN-100604,
+2025-05-05 07:45:00,Sunrise Apartments,Rent,-1150.00,USD,Checking,Bank Transfer,RENT-0525,May rent
+2025-05-07 08:00:00,Metro Transit,Transport,-25.00,USD,Checking,Debit Card,TXN-100631,Monthly top-up
+2025-05-14 11:30:00,City Power & Light,Utilities,-88.47,USD,Checking,Direct Debit,UTIL-0514,"Electricity, Apr usage"
+2025-05-24 19:15:52,Cinema Paradiso,Entertainment,-32.00,USD,Credit Card,Credit Card,TXN-100702,Movie night for two

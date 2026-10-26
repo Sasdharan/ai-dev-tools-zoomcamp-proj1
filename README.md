@@ -90,6 +90,19 @@ npm ci
 npm run dev
 ```
 
+To try the app with example data, open the frontend and use **Import CSV** to
+upload one of the files in [`sample-data/`](sample-data/):
+
+- [`test_history.csv`](sample-data/test_history.csv) uses the standard
+  `Date,Amount,Merchant,Category` columns and contains four transactions.
+- [`bank_export_detailed.csv`](sample-data/bank_export_detailed.csv) mimics a
+  bank export with three months of salary, rent, groceries, utilities, and other
+  transactions. It uses the alternative `Transaction Date`, `Description`, and
+  `Expense Category` headers and adds `Currency`, `Account`, `Payment Method`,
+  `Reference`, and `Notes` columns, which the importer ignores.
+
+The backend tests import both files, so keep them valid when changing them.
+
 ## API and data
 
 - `GET /api/v1/transactions` lists saved transactions.
@@ -98,6 +111,11 @@ npm run dev
 - `PUT /api/v1/transactions/{transaction_id}` updates a transaction.
 - `DELETE /api/v1/transactions/{transaction_id}` deletes a transaction.
 - `GET /api/v1/transactions/export` downloads a CSV.
+- `GET /api/v1/transactions/summary` returns spending, income, and net totals,
+  spending by category, and income/spending by month. A category whose amounts
+  net to a positive value (for example, Salary) counts as income. Every other
+  category counts as spending, and positive amounts in it, such as refunds,
+  reduce that category's spending. Monthly values are never below zero.
 - `POST /api/v1/transactions/import` imports a CSV.
 
 CSV uses `Date,Amount,Merchant,Category` columns. Schema changes are applied

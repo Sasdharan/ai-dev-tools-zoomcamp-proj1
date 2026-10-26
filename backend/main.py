@@ -35,6 +35,27 @@ class TransactionResponse(TransactionInput):
     id: int
 
 
+class CategorySpending(BaseModel):
+    category: str
+    spending: Decimal
+    count: int
+
+
+class MonthlyTotals(BaseModel):
+    month: str
+    income: Decimal
+    spending: Decimal
+
+
+class TransactionSummaryResponse(BaseModel):
+    transaction_count: int
+    total_income: Decimal
+    total_spending: Decimal
+    net: Decimal
+    by_category: list[CategorySpending]
+    by_month: list[MonthlyTotals]
+
+
 class ImportRowError(BaseModel):
     row_number: int
     errors: list[str]
@@ -111,6 +132,78 @@ def list_transactions(
 ) -> list[Transaction]:
     statement = select(Transaction).order_by(Transaction.id)
     return list(database_session.scalars(statement).all())
+
+
+@app.get(
+    "/api/v1/transactions/summary",
+    response_model=TransactionSummaryResponse,
+)
+def summarize_transactions(
+    database_session: Annotated[Session, Depends(get_db)],
+) -> TransactionSummaryResponse:
+    # A category whose amounts net to a positive value is treated as income
+    # (e.g. Salary). Every other category is spending, so positive amounts in
+    # it (refunds, cashback) reduce that category's spending instead of
+    # counting as income.
+    zero = Decimal("0.00")
+    statement = select(
+        Transaction.date, Transaction.amount, Transaction.category
+    ).order_by(Transaction.date)
+    rows = database_session.execute(statement).all()
+
+    category_net: dict[str, Decimal] = {}
+    category_count: dict[str, int] = {}
+    for _, amount, category in rows:
+        category_net[category] = category_net.get(category, zero) + amount
+        category_count[category] = category_count.get(category, 0) + 1
+    income_categories = {category for category, net in category_net.items() if net > 0}
+
+    month_income: dict[str, Decimal] = {}
+    month_spending: dict[str, Decimal] = {}
+    for transaction_date, amount, category in rows:
+        month_key = transaction_date.strftime("%Y-%m")
+        month_income.setdefault(month_key, zero)
+        month_spending.setdefault(month_key, zero)
+        if category in income_categories:
+            month_income[month_key] += amount
+        else:
+            month_spending[month_key] -= amount
+
+    total_income = zero
+    total_spending = zero
+    by_category: list[CategorySpending] = []
+    for category, net in category_net.items():
+        if category in income_categories:
+            total_income += net
+        elif net < 0:
+            spending = zero - net
+            total_spending += spending
+            by_category.append(
+                CategorySpending(
+                    category=category,
+                    spending=spending,
+                    count=category_count[category],
+                )
+            )
+
+    return TransactionSummaryResponse(
+        transaction_count=len(rows),
+        total_income=total_income,
+        total_spending=total_spending,
+        net=total_income - total_spending,
+        by_category=sorted(
+            by_category,
+            key=lambda item: (-item.spending, item.category.casefold()),
+        ),
+        by_month=[
+            MonthlyTotals(
+                month=month_key,
+                income=max(zero, month_income[month_key]),
+                spending=max(zero, month_spending[month_key]),
+            )
+            for month_key in sorted(month_income)
+        ],
+    )
 
 
 @app.get("/api/v1/transactions/export")

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import SpendingDashboard from "./SpendingDashboard.jsx";
 import {
   createTransaction,
   deleteTransaction,
   exportTransactions,
+  fetchTransactionSummary,
   fetchTransactions,
   importTransactions,
   updateTransaction,
@@ -41,10 +43,26 @@ export default function App() {
   const [importMessage, setImportMessage] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [summary, setSummary] = useState(null);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState("");
+
+  async function loadSummary() {
+    setIsSummaryLoading(true);
+    setSummaryError("");
+    try {
+      setSummary(await fetchTransactionSummary());
+    } catch (error) {
+      setSummaryError(error.message);
+    } finally {
+      setIsSummaryLoading(false);
+    }
+  }
 
   async function loadTransactions() {
     setIsLoading(true);
     setLoadError("");
+    loadSummary();
     try {
       setTransactions(await fetchTransactions());
     } catch (error) {
@@ -146,6 +164,7 @@ export default function App() {
       setTransactions((currentTransactions) =>
         currentTransactions.filter((item) => item.id !== transaction.id),
       );
+      loadSummary();
       if (editingTransactionId === transaction.id) {
         cancelEditing();
       }
@@ -228,6 +247,13 @@ export default function App() {
           $
         </div>
       </header>
+
+      <SpendingDashboard
+        error={summaryError}
+        isLoading={isSummaryLoading}
+        onRetry={loadSummary}
+        summary={summary}
+      />
 
       <div className="dashboard-grid">
         <section className="panel form-panel" aria-labelledby="new-transaction">

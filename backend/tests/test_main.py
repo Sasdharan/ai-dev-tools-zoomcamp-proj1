@@ -50,6 +50,7 @@ def test_app_generates_openapi_schema() -> None:
     assert "/api/v1/transactions" in schema["paths"]
     assert "/api/v1/transactions/export" in schema["paths"]
     assert "/api/v1/transactions/import" in schema["paths"]
+    assert "/api/v1/transactions/summary" in schema["paths"]
 
 
 def test_health_check_returns_ok(client: TestClient) -> None:
@@ -124,6 +125,94 @@ def test_export_transactions_with_no_saved_transactions_returns_header_only_csv(
     assert response.status_code == 200
     assert response.headers["content-type"] == "text/csv; charset=utf-8"
     assert response.text == "Date,Amount,Merchant,Category\r\n"
+
+
+def test_summarize_transactions_with_no_saved_transactions(client: TestClient) -> None:
+    response = client.get("/api/v1/transactions/summary")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "transaction_count": 0,
+        "total_income": "0.00",
+        "total_spending": "0.00",
+        "net": "0.00",
+        "by_category": [],
+        "by_month": [],
+    }
+
+
+def test_summarize_transactions_groups_spending_and_income(client: TestClient) -> None:
+    for date, amount, merchant, category in (
+        ("2025-01-03T09:00:00", "-45.50", "Supermarket", "Groceries"),
+        ("2025-01-15T12:00:00", "-12.25", "Cafe", "Dining"),
+        ("2025-01-31T18:00:00", "2500.00", "Employer", "Salary"),
+        ("2025-02-02T10:00:00", "-30.00", "Market", "Groceries"),
+    ):
+        client.post(
+            "/api/v1/transactions",
+            json={
+                "date": date,
+                "amount": amount,
+                "merchant": merchant,
+                "category": category,
+            },
+        )
+
+    response = client.get("/api/v1/transactions/summary")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "transaction_count": 4,
+        "total_income": "2500.00",
+        "total_spending": "87.75",
+        "net": "2412.25",
+        "by_category": [
+            {"category": "Groceries", "spending": "75.50", "count": 2},
+            {"category": "Dining", "spending": "12.25", "count": 1},
+        ],
+        "by_month": [
+            {"month": "2025-01", "income": "2500.00", "spending": "57.75"},
+            {"month": "2025-02", "income": "0.00", "spending": "30.00"},
+        ],
+    }
+
+
+def test_summarize_transactions_nets_refunds_against_spending_categories(
+    client: TestClient,
+) -> None:
+    for date, amount, merchant, category in (
+        ("2025-01-02T10:00:00", "-100.00", "Electronics Store", "Shopping"),
+        ("2025-01-10T10:00:00", "-40.00", "Supermarket", "Groceries"),
+        ("2025-01-31T09:00:00", "2000.00", "Employer", "Salary"),
+        ("2025-02-05T10:00:00", "30.00", "Electronics Store", "Shopping"),
+        ("2025-02-06T10:00:00", "40.00", "Supermarket", "Groceries"),
+    ):
+        client.post(
+            "/api/v1/transactions",
+            json={
+                "date": date,
+                "amount": amount,
+                "merchant": merchant,
+                "category": category,
+            },
+        )
+
+    response = client.get("/api/v1/transactions/summary")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "transaction_count": 5,
+        "total_income": "2000.00",
+        "total_spending": "70.00",
+        "net": "1930.00",
+        "by_category": [
+            {"category": "Shopping", "spending": "70.00", "count": 2},
+        ],
+        "by_month": [
+            {"month": "2025-01", "income": "2000.00", "spending": "140.00"},
+            {"month": "2025-02", "income": "0.00", "spending": "0.00"},
+        ],
+    }
 
 
 def test_create_transaction_rejects_invalid_input(client: TestClient) -> None:
@@ -253,6 +342,67 @@ def test_import_transactions_keeps_valid_rows_and_reports_invalid_rows(
     assert response.json()["rejected"][0]["row_number"] == 3
     assert response.json()["rejected"][0]["errors"]
     assert len(client.get("/api/v1/transactions").json()) == 2
+
+
+def test_import_sample_history_csv_populates_summary(client: TestClient) -> None:
+    sample_csv = PROJECT_ROOT / "sample-data" / "test_history.csv"
+
+    response = client.post(
+        "/api/v1/transactions/import",
+        files={"file": (sample_csv.name, sample_csv.read_bytes(), "text/csv")},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"imported": 4, "rejected": []}
+    summary = client.get("/api/v1/transactions/summary").json()
+    assert summary["transaction_count"] == 4
+    assert summary["total_income"] == "1500.00"
+    assert summary["total_spending"] == "64.30"
+    assert [item["category"] for item in summary["by_category"]] == [
+        "Groceries",
+        "Transport",
+        "Food & Drinks",
+    ]
+
+
+def test_import_detailed_bank_export_csv_maps_aliases_and_ignores_extra_columns(
+    client: TestClient,
+) -> None:
+    sample_csv = PROJECT_ROOT / "sample-data" / "bank_export_detailed.csv"
+
+    response = client.post(
+        "/api/v1/transactions/import",
+        files={"file": (sample_csv.name, sample_csv.read_bytes(), "text/csv")},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"imported": 24, "rejected": []}
+    transactions = client.get("/api/v1/transactions").json()
+    assert len(transactions) == 24
+    assert transactions[1] == {
+        "id": 2,
+        "date": "2025-03-02T18:20:45",
+        "amount": "-82.35",
+        "merchant": "Green Valley Market",
+        "category": "Groceries",
+    }
+    assert set(transactions[0]) == {"id", "date", "amount", "merchant", "category"}
+
+    summary = client.get("/api/v1/transactions/summary").json()
+    assert summary["transaction_count"] == 24
+    assert summary["total_income"] == "10050.00"
+    assert summary["total_spending"] == "4225.76"
+    assert summary["net"] == "5824.24"
+    assert summary["by_category"][:2] == [
+        {"category": "Rent", "spending": "3450.00", "count": 3},
+        {"category": "Groceries", "spending": "237.65", "count": 4},
+    ]
+    assert len(summary["by_category"]) == 10
+    assert summary["by_month"] == [
+        {"month": "2025-03", "income": "3650.00", "spending": "1422.76"},
+        {"month": "2025-04", "income": "3200.00", "spending": "1431.33"},
+        {"month": "2025-05", "income": "3200.00", "spending": "1371.67"},
+    ]
 
 
 def test_import_header_only_csv_returns_empty_result(client: TestClient) -> None:
