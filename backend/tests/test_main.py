@@ -42,6 +42,7 @@ def client(tmp_path, monkeypatch):
         database_engine.dispose()
 
 
+@pytest.mark.smoke
 def test_app_generates_openapi_schema() -> None:
     schema = app.openapi()
 
@@ -53,6 +54,7 @@ def test_app_generates_openapi_schema() -> None:
     assert "/api/v1/transactions/summary" in schema["paths"]
 
 
+@pytest.mark.smoke
 def test_health_check_returns_ok(client: TestClient) -> None:
     response = client.get("/health")
 

@@ -25,6 +25,7 @@ def test_get_database_url_requires_configuration(
         get_database_url()
 
 
+@pytest.mark.smoke
 def test_sqlite_engine_can_connect() -> None:
     database_engine = create_database_engine("sqlite:///:memory:")
     try:

@@ -15,7 +15,10 @@
 - **Setup:** Create `.env` from `.env.example` only if `.env` does not already exist, then `cd backend && uv sync`
 - **Build:** `docker compose --env-file .env up --build`
 - **Test:** `cd backend && uv run pytest -v`
+- **Smoke test:** `cd backend && uv run pytest -m smoke -q`
 - **Lint:** `cd backend && uv run ruff check . ../migrations && uv run ruff format --check . ../migrations`
+- **Format/fix:** `cd backend && uv run ruff check --fix . ../migrations && uv run ruff format . ../migrations`
+- For formatting/lint-only changes (no behavior change), run lint plus the smoke tests instead of the full suite.
 
 ## Project Documentation
 

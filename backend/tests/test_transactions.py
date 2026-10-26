@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect
@@ -11,6 +12,7 @@ from models import Transaction
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
+@pytest.mark.smoke
 def test_transaction_model_defines_csv_fields() -> None:
     transaction = Transaction(
         date=datetime(2025, 1, 1, 14, 22, 10),
