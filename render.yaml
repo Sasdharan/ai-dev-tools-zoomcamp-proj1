@@ -61,12 +61,12 @@ services:
         sync: false
 
 databases:
-  - name: expense-tracker-db
+  - name: expense-tracker-db-dev
     plan: free
     databaseName: expense_tracker_dev
     user: expense_tracker_dev
 
-  - name: expense-tracker-db
+  - name: expense-tracker-db-prod
     plan: free
     databaseName: expense_tracker_prod
     user: expense_tracker_prod
