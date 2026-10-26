@@ -19,6 +19,8 @@ from database import get_db
 from main import app
 from telemetry import REQUEST_LOGGER, meter_provider, metric_reader, tracer_provider
 
+pytestmark = pytest.mark.integration
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 

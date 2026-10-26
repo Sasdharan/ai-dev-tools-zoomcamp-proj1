@@ -12,6 +12,7 @@ from models import Transaction
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
+@pytest.mark.unit
 @pytest.mark.smoke
 def test_transaction_model_defines_csv_fields() -> None:
     transaction = Transaction(
@@ -27,6 +28,7 @@ def test_transaction_model_defines_csv_fields() -> None:
     assert transaction.category == "Groceries"
 
 
+@pytest.mark.integration
 def test_migration_creates_transaction_table(tmp_path, monkeypatch) -> None:
     database_url = f"sqlite:///{(tmp_path / 'migration.db').as_posix()}"
     monkeypatch.setenv("DATABASE_URL", database_url)

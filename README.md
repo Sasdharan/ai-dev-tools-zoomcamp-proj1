@@ -129,17 +129,28 @@ only through Alembic migration scripts in `migrations/`.
 
 ## Validation
 
+All backend tests (unit and integration) run with a single command:
+`cd backend; uv run pytest -v`.
+
+- **Unit tests** (`-m unit`) check settings, the database URL/driver
+  selection, Alembic configuration, and the transaction model in isolation.
+- **Integration tests** (`-m integration`) run the FastAPI app through
+  `TestClient` against a migrated SQLite database: CRUD, CSV import/export,
+  summaries, migrations, and trace/log/metric correlation.
+
 ```powershell
 cd backend
 uv run pytest -v
+uv run pytest -m unit -v
+uv run pytest -m integration -v
 uv run ruff check . ..\migrations
 uv run ruff format --check . ..\migrations
 cd ..\frontend
 npm run build
 ```
 
-SMS transaction intake (issue 14) remains out of scope for the MVP until that
-contract and behavior are agreed.
+SMS transaction intake (issue #14) was scoped and deferred: it is not part of
+the MVP, and no SMS webhook is implemented.
 
 ## Future implementation direction
 

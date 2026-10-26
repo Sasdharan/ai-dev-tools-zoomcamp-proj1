@@ -35,4 +35,9 @@ known-first-party = ["database", "main", "models", "settings", "telemetry"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-markers = ["smoke: fast sanity checks for formatting/lint-only changes"]
+addopts = "--strict-markers"
+markers = [
+    "smoke: fast sanity checks for formatting/lint-only changes",
+    "unit: isolated tests of functions, settings, and models without a database",
+    "integration: HTTP API, database, migration, and telemetry tests against SQLite",
+]
