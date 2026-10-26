@@ -13,7 +13,7 @@ local development, while Docker Compose runs the app with PostgreSQL.
 
 ## What it can do
 
-- Create and review transactions in the frontend.
+- Create, review, edit, and delete transactions in the frontend.
 - Import transactions from CSV and export saved transactions as CSV.
 - Run locally with SQLite or as a containerized app backed by PostgreSQL.
 
@@ -45,6 +45,28 @@ runs the committed Alembic migrations, then starts the API and frontend. Stop
 the services with `docker compose --env-file .env down`; the database volume is
 preserved.
 
+## Observability
+
+The Compose stack also starts an OpenTelemetry Collector, Prometheus, Loki,
+Tempo, and Grafana. Open Grafana at `http://localhost:3001` to view the
+transaction API dashboard, correlate request logs with traces, and inspect the
+`transaction-api-5xx` alert. Grafana is configured for anonymous local access
+and bound to loopback; do not expose port `3001` beyond your trusted machine.
+
+To verify the alert locally, briefly stop the Compose database and make a
+transaction-list request to produce a controlled API 5xx, then immediately
+restart the database:
+
+```powershell
+docker compose --env-file .env stop db
+Invoke-WebRequest -Uri http://localhost:8000/api/v1/transactions -Method Get
+docker compose --env-file .env start db
+```
+
+The alert should fire after evaluation and return to normal once the 5-minute
+error window has cleared. Perform this check only on a local test stack, not
+while the application is in active use.
+
 ## Local development
 
 Ensure the root `.env` exists; copy `.env.example` only if it is missing. For
@@ -73,6 +95,8 @@ npm run dev
 - `GET /api/v1/transactions` lists saved transactions.
 - `POST /api/v1/transactions` creates a transaction with `date`, `amount`,
   `merchant`, and `category`.
+- `PUT /api/v1/transactions/{transaction_id}` updates a transaction.
+- `DELETE /api/v1/transactions/{transaction_id}` deletes a transaction.
 - `GET /api/v1/transactions/export` downloads a CSV.
 - `POST /api/v1/transactions/import` imports a CSV.
 
@@ -114,4 +138,3 @@ details are intentionally undecided: there is currently no SMS webhook or
 payload contract. Keep the work behind tests for valid messages, invalid or
 ambiguous messages, and duplicate delivery; any schema changes must use
 Alembic migrations.
-

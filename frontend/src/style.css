@@ -23,6 +23,12 @@ input {
   font: inherit;
 }
 
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgb(74 153 119 / 35%);
+  outline-offset: 2px;
+}
+
 .app-shell {
   width: min(100% - 40px, 1160px);
   margin: 0 auto;
@@ -161,6 +167,73 @@ h2 {
   transition: background 120ms ease;
 }
 
+.form-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.secondary-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #cbdcd0;
+  border-radius: 9px;
+  background: #f5f8f4;
+  color: #28664f;
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.secondary-button:hover {
+  background: #eaf2eb;
+}
+
+.secondary-button:disabled,
+.text-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.data-tools {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #edf1ed;
+}
+
+.import-form {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.import-form label {
+  color: #364944;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.import-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.import-controls input {
+  width: 100%;
+  min-width: 0;
+  color: #63736b;
+  font-size: 0.8rem;
+}
+
+.import-message {
+  white-space: pre-line;
+}
+
 .submit-button:hover,
 .retry-button:hover {
   background: #28664f;
@@ -238,6 +311,29 @@ h2 {
   white-space: nowrap;
 }
 
+.transaction-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.text-button {
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: #317a61;
+  cursor: pointer;
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.text-button:hover {
+  text-decoration: underline;
+}
+
+.danger-button {
+  color: #a33835;
+}
+
 .state-message {
   padding: 26px 20px;
   border: 1px dashed #dbe5dd;
@@ -285,5 +381,16 @@ h2 {
   .transaction-item {
     align-items: flex-start;
     gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .transaction-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .data-tools {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 }
