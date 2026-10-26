@@ -25,11 +25,12 @@ Transactions have a category. Provide common editable categories, and allow user
 
 ## CSV import
 
-- Accept CSV files.
-- Detect common column names and layouts, then let the user review and correct the column mapping.
-- Preview parsed transactions and obtain confirmation before saving.
-- Import valid rows when other rows are invalid, and report invalid rows with enough information to correct them.
-- Skip likely duplicates when date, amount, description, and account all match. Report skipped duplicates in the import results.
+- The MVP accepts browser CSV uploads at `POST /api/v1/transactions/import` using the multipart field `file`.
+- Automatically map required fields after normalizing header case, spaces, underscores, and hyphens. Recognize `Date`, `Transaction Date`, or `Posted Date`; `Amount` or `Transaction Amount`; `Merchant`, `Description`, or `Payee`; and `Category` or `Expense Category`.
+- Ignore columns that do not map to those four transaction fields.
+- Reject an empty file, unreadable CSV, or missing required column with a clear error and no saved rows. A header-only file is a successful empty import.
+- Import valid rows when other rows are invalid. Return an `imported` count and a `rejected` list containing each rejected CSV row number and its validation errors.
+- Defer interactive mapping, preview, row correction, and confirmation. Defer duplicate detection until account data is represented in the transaction model.
 
 ## CSV export
 

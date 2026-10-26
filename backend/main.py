@@ -1,9 +1,12 @@
+import csv
+import io
+import re
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Response, status
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile, status
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,6 +25,52 @@ class TransactionResponse(TransactionInput):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+
+
+class ImportRowError(BaseModel):
+    row_number: int
+    errors: list[str]
+
+
+class ImportTransactionsResponse(BaseModel):
+    imported: int
+    rejected: list[ImportRowError]
+
+
+CSV_FIELD_ALIASES = {
+    "date": {"date", "transactiondate", "posteddate"},
+    "amount": {"amount", "transactionamount"},
+    "merchant": {"merchant", "description", "payee"},
+    "category": {"category", "expensecategory"},
+}
+
+
+def _normalize_csv_header(header: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", header.casefold())
+
+
+def _map_csv_headers(headers: list[str]) -> dict[str, str]:
+    mapped_headers: dict[str, str] = {}
+    for header in headers:
+        normalized_header = _normalize_csv_header(header)
+        for field, aliases in CSV_FIELD_ALIASES.items():
+            if normalized_header not in aliases:
+                continue
+            if field in mapped_headers:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Multiple CSV columns map to {field}",
+                )
+            mapped_headers[field] = header
+
+    missing_fields = set(CSV_FIELD_ALIASES) - mapped_headers.keys()
+    if missing_fields:
+        missing_headers = ", ".join(sorted(missing_fields))
+        raise HTTPException(
+            status_code=422,
+            detail=f"CSV is missing required columns: {missing_headers}",
+        )
+    return mapped_headers
 
 
 app = FastAPI(title="Personal Expense Tracker API")
@@ -49,6 +98,82 @@ def list_transactions(
 ) -> list[Transaction]:
     statement = select(Transaction).order_by(Transaction.id)
     return list(database_session.scalars(statement).all())
+
+
+@app.post(
+    "/api/v1/transactions/import",
+    response_model=ImportTransactionsResponse,
+)
+async def import_transactions(
+    file: Annotated[UploadFile, File()],
+    database_session: Annotated[Session, Depends(get_db)],
+) -> ImportTransactionsResponse:
+    file_content = await file.read()
+    if not file_content.strip():
+        raise HTTPException(status_code=422, detail="CSV file is empty")
+
+    try:
+        csv_content = file_content.decode("utf-8-sig")
+    except UnicodeDecodeError as error:
+        raise HTTPException(
+            status_code=422,
+            detail="CSV file must use UTF-8 encoding",
+        ) from error
+
+    reader = csv.DictReader(io.StringIO(csv_content, newline=""), strict=True)
+    try:
+        headers = reader.fieldnames
+        if not headers:
+            raise HTTPException(status_code=422, detail="CSV file has no header row")
+        mapped_headers = _map_csv_headers(headers)
+
+        valid_transactions: list[TransactionInput] = []
+        rejected_rows: list[ImportRowError] = []
+        for row_number, row in enumerate(reader, start=2):
+            if None in row:
+                rejected_rows.append(
+                    ImportRowError(
+                        row_number=row_number,
+                        errors=["Row has more values than the header columns"],
+                    )
+                )
+                continue
+
+            transaction_data = {
+                field: (row.get(header) or "").strip()
+                for field, header in mapped_headers.items()
+            }
+            try:
+                valid_transactions.append(
+                    TransactionInput.model_validate(transaction_data)
+                )
+            except ValidationError as error:
+                rejected_rows.append(
+                    ImportRowError(
+                        row_number=row_number,
+                        errors=[
+                            f"{'.'.join(str(part) for part in issue['loc'])}: {issue['msg']}"
+                            for issue in error.errors()
+                        ],
+                    )
+                )
+    except csv.Error as error:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Malformed CSV file: {error}",
+        ) from error
+
+    if valid_transactions:
+        database_session.add_all(
+            Transaction(**transaction.model_dump())
+            for transaction in valid_transactions
+        )
+        database_session.commit()
+
+    return ImportTransactionsResponse(
+        imported=len(valid_transactions),
+        rejected=rejected_rows,
+    )
 
 
 @app.put(

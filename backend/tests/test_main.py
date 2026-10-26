@@ -45,6 +45,7 @@ def test_app_generates_openapi_schema() -> None:
 
     assert schema["info"]["title"] == "Personal Expense Tracker API"
     assert "/api/v1/transactions" in schema["paths"]
+    assert "/api/v1/transactions/import" in schema["paths"]
 
 
 def test_create_and_list_transactions(client: TestClient) -> None:
@@ -158,3 +159,85 @@ def test_update_transaction_rejects_invalid_input(client: TestClient) -> None:
 
     assert response.status_code == 422
     assert response.json()["detail"]
+
+
+def test_import_transactions_maps_headers_and_ignores_extra_columns(
+    client: TestClient,
+) -> None:
+    csv_content = (
+        b"Transaction Date,Amount,Payee,Expense Category,Notes\n"
+        b"2025-01-01 14:22:10,-45.50,Supermarket,Groceries,weekly shop\n"
+        b"2025-01-03,1500.00,Employer,Salary,payday\n"
+    )
+
+    response = client.post(
+        "/api/v1/transactions/import",
+        files={"file": ("transactions.csv", csv_content, "text/csv")},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"imported": 2, "rejected": []}
+    transactions = client.get("/api/v1/transactions").json()
+    assert [transaction["merchant"] for transaction in transactions] == [
+        "Supermarket",
+        "Employer",
+    ]
+
+
+def test_import_transactions_keeps_valid_rows_and_reports_invalid_rows(
+    client: TestClient,
+) -> None:
+    csv_content = (
+        b"Date,Amount,Merchant,Category\n"
+        b"2025-01-01,-45.50,Supermarket,Groceries\n"
+        b"not-a-date,-12.00,City Transit,Transport\n"
+        b"2025-01-05,1500.00,Employer,Salary\n"
+    )
+
+    response = client.post(
+        "/api/v1/transactions/import",
+        files={"file": ("transactions.csv", csv_content, "text/csv")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["imported"] == 2
+    assert response.json()["rejected"][0]["row_number"] == 3
+    assert response.json()["rejected"][0]["errors"]
+    assert len(client.get("/api/v1/transactions").json()) == 2
+
+
+def test_import_header_only_csv_returns_empty_result(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/transactions/import",
+        files={
+            "file": (
+                "transactions.csv",
+                b"Date,Amount,Merchant,Category\n",
+                "text/csv",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"imported": 0, "rejected": []}
+    assert client.get("/api/v1/transactions").json() == []
+
+
+def test_import_rejects_empty_malformed_and_missing_header_files(
+    client: TestClient,
+) -> None:
+    invalid_files = [
+        b"",
+        b'Date,Amount,Merchant,Category\n2025-01-01,1,Shop,Food\n"unterminated,1,Shop,Food\n',
+        b"Date,Amount,Merchant\n2025-01-01,1,Shop\n",
+    ]
+
+    for file_content in invalid_files:
+        response = client.post(
+            "/api/v1/transactions/import",
+            files={"file": ("transactions.csv", file_content, "text/csv")},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"]
+        assert client.get("/api/v1/transactions").json() == []
