@@ -59,9 +59,15 @@ the repository's documented Python and environment setup:
 
 - Run `uv sync` from `backend/` when that directory and its `pyproject.toml`
   are present.
+- Check whether `.env` exists with a filesystem check, not just workspace
+  search or Git status; local config files may be hidden, ignored, or
+  untracked. For example, use `Test-Path -LiteralPath .env` in PowerShell or
+  `test -f .env` in a POSIX shell. Never overwrite an existing `.env`; create
+  it from `.env.example` only when it is absent.
 - Configure a worktree-specific `DATABASE_URL` in its `.env`. Use a separate
   SQLite database file for local SQLite work, or a distinct PostgreSQL
-  database for containerized work.
+  database for containerized work. Confirm that configuration is available
+  without printing the URL or other secret values.
 - Never let concurrent worktrees or test runs write to the same database.
 - Keep secrets out of Git; use `.env` and the repository's environment
   template.

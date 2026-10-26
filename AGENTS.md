@@ -12,7 +12,7 @@
 
 ## Critical Commands
 
-- **Setup:** `cp .env.example .env`, then `cd backend && uv sync`
+- **Setup:** Create `.env` from `.env.example` only if `.env` does not already exist, then `cd backend && uv sync`
 - **Build:** `docker compose --env-file .env up --build`
 - **Test:** `cd backend && uv run pytest -v`
 - **Lint:** `cd backend && uv run ruff check . ../migrations && uv run ruff format --check . ../migrations`
@@ -27,7 +27,7 @@ If the SMS webhook route is not implemented, do not invent a payload schema.
 Ask the user whether to implement it, and state which parts of SMS intake are missing.
 - Database migrations must strictly happen via Alembic migration scripts stored in `/migrations`.
 Do not call SQLAlchemy `create_all` or alter tables at runtime.
-- Use SQLAlchemy ORM for all database access. Select the database backend only via the `DATABASE_URL` environment variable in `.env`; do not hardcode driver-specific SQL or connection strings. If `.env` is missing or `DATABASE_URL` is unset, stop and tell the user to run `cp .env.example .env` and set `DATABASE_URL`. Do not fall back to a hardcoded connection string.
+- Use SQLAlchemy ORM for all database access. Select the database backend only via the `DATABASE_URL` environment variable in `.env`; do not hardcode driver-specific SQL or connection strings. Do not infer that `.env` is absent from workspace search results or Git status: local environment files may be hidden, ignored, or untracked. Check the filesystem directly, and do not overwrite an existing `.env`. If the file is genuinely absent, tell the user to create it from `.env.example`; if `DATABASE_URL` is unavailable, ask the user to set it. Verify configuration without printing or exposing its value. Do not fall back to a hardcoded connection string.
 
 ## Boundaries & Guardrails
 

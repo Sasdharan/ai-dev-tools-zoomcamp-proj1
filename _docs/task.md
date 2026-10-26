@@ -1,11 +1,12 @@
 # Backlog
 
 Tasks moved to GitHub issues. Track status and updates there.
+Github link : <https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1>
 
-1. [Setting up an empty backend with a passing test](https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1/issues/1)
-2. [Configuring environment-based application settings](https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1/issues/2)
-3. [Connecting SQLAlchemy to configured databases](https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1/issues/3)
-4. [Setting up Alembic migrations](https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1/issues/4)
+1. [x] [Setting up an empty backend with a passing test](https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1/issues/1)
+2. [x] [Configuring environment-based application settings](https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1/issues/2)
+3. [x] [Connecting SQLAlchemy to configured databases](https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1/issues/3)
+4. [x] [Setting up Alembic migrations](https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1/issues/4)
 5. [Adding the transaction persistence model](https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1/issues/5)
 6. [Creating and listing transactions through the API](https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1/issues/6)
 7. [Updating and deleting transactions through the API](https://github.com/Sasdharan/ai-dev-tools-zoomcamp-proj1/issues/7)

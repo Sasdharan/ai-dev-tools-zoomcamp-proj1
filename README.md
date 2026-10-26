@@ -39,11 +39,13 @@ To run everything directly on your mobile device inside **Termux** using local l
    pkg install python nodejs-lts git -y
    ```
 
-2. Clone your workspace and navigate into the `backend/` engine. Initialize your server natively (It automatically defaults to zero-dependency local SQLite file storage):
+2. Clone your workspace. Copy `.env.example` to `.env` at the repository root to configure local SQLite with `DATABASE_URL=sqlite:///./expense_tracker.db`. Then install dependencies and start the backend:
 
    ```bash
-   pip install fastapi uvicorn sqlalchemy pydantic requests
-   python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+   cp .env.example .env
+   cd backend
+   uv sync
+   uv run uvicorn main:app --host 127.0.0.1 --port 8000 --reload
    ```
 
 3. Open a second Termux terminal frame, step into `frontend/`, launch a local preview or build static assets, and use mobile browsers (e.g., Chrome) to view `http://localhost:3000` and trigger **"Add to Home Screen"** to spin up your native installable standalone PWA app structure.
