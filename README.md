@@ -1,85 +1,117 @@
 # Personal Expense Tracker
 
-Personal Expense Tracker that allows import/export and track transaction from on SMS
+I started this project because the expense tracker I relied on reached end of
+life and lost official support. Rather than simply look for another app, I
+decided to build a small replacement that I can run and maintain myself. It has
+also been a chance to put the tools and ideas from the Zoomcamp project into
+practice.
 
-🚀 Motivation
+The goal is a straightforward personal expense tracker: save transactions,
+review them in a simple frontend, and move existing records in or out with CSV.
+The React/Vite frontend talks to a FastAPI backend. SQLite is available for
+local development, while Docker Compose runs the app with PostgreSQL.
 
-- **This project was born out of a personal need when the expense tracker app I relied on reached its end-of-life and lost official support.**
-- Instead of just looking for a commercial replacement, I used this as an opportunity to build my own solution, as part of my Zoomcamp project.
+## What it can do
 
-## Features
+- Create and review transactions in the frontend.
+- Import transactions from CSV and export saved transactions as CSV.
+- Run locally with SQLite or as a containerized app backed by PostgreSQL.
 
-- Allow CSV import/export
-- Export saved transactions as a CSV download from `GET /api/v1/transactions/export`
-- Use the CSV columns `Date,Amount,Merchant,Category`
+## Run the application with Docker Compose
 
-## Frontend
+Install Docker Compose, then create `.env` from `.env.example` only if `.env`
+does not already exist. Set `DATABASE_URL` in `.env` to the PostgreSQL service
+URL and make its password match `POSTGRES_PASSWORD`:
 
-The React/Vite frontend is a standalone starter page and does not require the API:
+```dotenv
+DATABASE_URL=postgresql+psycopg2://expense_tracker:change-me-local@db:5432/expense_tracker
+POSTGRES_DB=expense_tracker
+POSTGRES_USER=expense_tracker
+POSTGRES_PASSWORD=change-me-local
+```
 
-```bash
+Replace the sample password with a private value in your local `.env`; do not
+commit `.env`. The URL must use the same database, username, and password as
+the PostgreSQL settings. Start the services from the repository root:
+
+```powershell
+docker compose --env-file .env up --build
+```
+
+The frontend is available at `http://localhost:3000`, the API documentation at
+`http://localhost:8000/docs`, and the backend health check at
+`http://localhost:8000/health`. Compose waits for PostgreSQL to become healthy,
+runs the committed Alembic migrations, then starts the API and frontend. Stop
+the services with `docker compose --env-file .env down`; the database volume is
+preserved.
+
+## Local development
+
+Ensure the root `.env` exists; copy `.env.example` only if it is missing. For
+local SQLite use, keep `DATABASE_URL=sqlite:///./expense_tracker.db` from
+`.env.example`. Install and migrate the backend, then run it:
+
+```powershell
+cd backend
+uv sync
+uv run alembic -c ..\alembic.ini upgrade head
+uv run uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+In a second terminal, start the Vite frontend. Its `/api` requests are proxied to
+`http://localhost:8000` by default; set `API_PROXY_TARGET` to use a different
+backend address.
+
+```powershell
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
-Create a production build with `npm run build`.
+## API and data
 
-## Future implementation
+- `GET /api/v1/transactions` lists saved transactions.
+- `POST /api/v1/transactions` creates a transaction with `date`, `amount`,
+  `merchant`, and `category`.
+- `GET /api/v1/transactions/export` downloads a CSV.
+- `POST /api/v1/transactions/import` imports a CSV.
 
-- Track transactions based on SMS
+CSV uses `Date,Amount,Merchant,Category` columns. Schema changes are applied
+only through Alembic migration scripts in `migrations/`.
 
-## 1. Setting Up the Target Environment
+## Validation
 
-### Approach A: Desktop Containerized Engine (For Zoomcamp Peer Review)
-
-To boot up the complete isolated environment containing the React frontend, FastAPI backend, and PostgreSQL engine:
-
-```bash
-docker-compose up --build
+```powershell
+cd backend
+uv run pytest -v
+uv run ruff check . ..\migrations
+uv run ruff format --check . ..\migrations
+cd ..\frontend
+npm run build
 ```
 
-- **Web UI URL:** `http://localhost:3000`
-- **Interactive OpenAPI Documentation:** `http://localhost:8000/docs`
+SMS transaction intake (issue 14) remains out of scope for the MVP until that
+contract and behavior are agreed.
 
-### Approach B: Native Android Storage Hosting (Personal Use-Case)
+## Future implementation direction
 
-To run everything directly on your mobile device inside **Termux** using local loopbacks and zero cloud dependencies:
+SMS-based transaction intake is a possible follow-up, not part of the current
+MVP. The intended high-level flow is:
 
-1. Open Termux on Android and provision core dependencies:
+1. A user-configured phone automation detects a relevant SMS and sends it to a
+   backend webhook.
+2. The backend validates the request and parses the message into the existing
+   transaction fields: date, amount, merchant, and category.
+3. The backend stores valid transactions through the existing SQLAlchemy
+   transaction flow, so they appear in the frontend and CSV exports like
+   manually created transactions.
+4. Invalid or unrecognized messages receive a clear error and are not silently
+   saved as transactions.
 
-   ```bash
-   pkg update && pkg upgrade -y
-   pkg install python nodejs-lts git -y
-   ```
+Before implementing this, define and document the webhook path and payload,
+how callers are authenticated, and how message formats are parsed. Those
+details are intentionally undecided: there is currently no SMS webhook or
+payload contract. Keep the work behind tests for valid messages, invalid or
+ambiguous messages, and duplicate delivery; any schema changes must use
+Alembic migrations.
 
-2. Clone your workspace. Copy `.env.example` to `.env` at the repository root to configure local SQLite with `DATABASE_URL=sqlite:///./expense_tracker.db`. Then install dependencies and start the backend:
-
-   ```bash
-   cp .env.example .env
-   cd backend
-   uv sync
-   uv run uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-   ```
-
-3. Open a second Termux terminal frame, step into `frontend/`, launch a local preview or build static assets, and use mobile browsers (e.g., Chrome) to view `http://localhost:3000` and trigger **"Add to Home Screen"** to spin up your native installable standalone PWA app structure.
-
----
-
-## 2. Local Tasker / MacroDroid Subsystem Dispatch Pipeline
-
-To replace your out-of-support application with real-time tracking streams running straight into your Termux backend API, configure your mobile tracking scripts (like **MacroDroid**) with these exact rule variables:
-
-- **Subsystem Event Trigger:** `SMS Received` ➔ `From Any Sender`
-- **Execution Event Action:** `HTTP POST`
-- **Target URL Destination:** `http://127.0.0.1:8000/api/v1/webhook/sms`
-- **Request Content-Type:** `application/json`
-- **Request Body Parameters Layout:**
-
-  ```json
-  {
-    "sender": "{sms_number}",
-    "text": "{sms_body}",
-    "timestamp": "{date_time_iso}"
-  }
-  ```

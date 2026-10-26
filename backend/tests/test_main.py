@@ -46,9 +46,17 @@ def test_app_generates_openapi_schema() -> None:
     schema = app.openapi()
 
     assert schema["info"]["title"] == "Personal Expense Tracker API"
+    assert "/health" in schema["paths"]
     assert "/api/v1/transactions" in schema["paths"]
     assert "/api/v1/transactions/export" in schema["paths"]
     assert "/api/v1/transactions/import" in schema["paths"]
+
+
+def test_health_check_returns_ok(client: TestClient) -> None:
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
 
 
 def test_create_and_list_transactions(client: TestClient) -> None:

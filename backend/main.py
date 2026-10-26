@@ -84,6 +84,11 @@ def _map_csv_headers(headers: list[str]) -> dict[str, str]:
 app = FastAPI(title="Personal Expense Tracker API")
 
 
+@app.get("/health")
+def health_check() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 @app.post(
     "/api/v1/transactions",
     response_model=TransactionResponse,
