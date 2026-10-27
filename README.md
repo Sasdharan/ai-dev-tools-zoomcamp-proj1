@@ -217,6 +217,12 @@ One-time setup:
 2. In Render, create a **Blueprint** from this repository. Set each frontend's
    `BACKEND_URL` to the public URL of the matching backend, e.g.
    `https://expense-tracker-api-dev.onrender.com`.
+   If creating services manually, select **Existing Image** and enter the
+   matching GHCR image URL. If an existing service fails looking for
+   `./Dockerfile`, open **Settings > Build > Source > Edit**, select
+   **Existing Image**, and connect the matching GHCR image instead of the Git
+   repository. Changing the Blueprint file alone does not configure a
+   separately created service.
 3. In GitHub **Settings > Environments**, create `development` and
    `production`. Add required reviewers to `production`. In each environment
    set:
