@@ -17,16 +17,20 @@ jobs:
   backend:
     name: Backend lint & test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.14.7"]
     defaults:
       run:
         working-directory: backend
     env:
       DATABASE_URL: sqlite:///./ci.db
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.2
         with:
-          python-version: "3.12"
+          version: "0.13.6"
+          python-version: ${{ matrix.python-version }}
       - run: uv sync --locked
       - name: Lint
         run: uv run ruff check . ../migrations && uv run ruff format --check . ../migrations
@@ -40,9 +44,19 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: "22"
+          node-version-file: frontend/.node-version
       - run: npm ci
       - run: npm run build
+
+  deployment:
+    name: Deployment regression checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Check deployment scripts
+        run: |
+          bash -n .github/scripts/deploy-render.sh .github/scripts/test-deploy-render.sh
+          bash .github/scripts/test-deploy-render.sh

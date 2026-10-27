@@ -75,6 +75,16 @@ while the application is in active use.
 
 ## Local development
 
+Use Python **3.14.7**, Node.js **24.22.1 (LTS)**, and uv **0.13.6**.
+The backend's `.python-version` and frontend's `.node-version` pin the
+development runtimes; select them with your version manager before running
+the commands below. `uv` honors `.python-version` automatically. The Docker
+images use the same Python and Node versions, and Render runs those images
+without choosing separate language runtimes. CI uses the same pins and also
+tests Python 3.10 to preserve the declared compatibility floor. Intermediate
+Python versions are not separately tested. Application-library upgrades are
+not part of this infrastructure update.
+
 Ensure the root `.env` exists; copy `.env.example` only if it is missing. For
 local SQLite use, keep `DATABASE_URL=sqlite:///./expense_tracker.db` from
 `.env.example`. Install and migrate the backend, then run it:
@@ -191,6 +201,10 @@ push to main -> CI (lint, tests, build)
              -> deploy the same images to production + /health check
 ```
 
+All JavaScript Actions use Node-24-based releases. This is separate from the
+Node version used to build the frontend. CI also runs the deployment helper's
+regression checks, without calling Render or requiring deployment secrets.
+
 ### Rollback
 
 Run **Actions > Deploy > Run workflow** with `image_tag` set to the commit SHA
@@ -231,6 +245,34 @@ One-time setup:
      service **Settings > Deploy Hook**);
    - variables `API_URL` (backend public URL) and `DEV_WEB_URL` /
      `PROD_WEB_URL` (frontend public URL).
+
+Use complete HTTPS URLs without surrounding quotes or whitespace. Copy each
+deploy hook directly from Render, including its `?key=...` query string.
+Do not use a dashboard URL or paste hook secrets into logs, issues, or chat.
+Both environments need their own configuration:
+
+| GitHub Environment | Secrets | Variables |
+| --- | --- | --- |
+| `development` | `RENDER_DEPLOY_HOOK_API`, `RENDER_DEPLOY_HOOK_WEB` | `API_URL`, `DEV_WEB_URL` |
+| `production` | `RENDER_DEPLOY_HOOK_API`, `RENDER_DEPLOY_HOOK_WEB` | `API_URL`, `PROD_WEB_URL` |
+
+The workflow validates all of an environment's configuration before triggering
+either service. A missing hook previously caused `curl: (3) URL rejected: Bad
+hostname`; it now reports the missing setting by name without exposing values.
+Secrets cannot be generated from the repository: create the Render services
+first and supply their hooks in GitHub **Settings > Environments**.
+
+The deploy helper sends URL-encoded `imgURL` parameters to select the exact
+GHCR image SHA, including for rollbacks. Render's `ref` parameter is for
+Git-source deployments, not these image-backed services. It then polls both
+the API's `/health` and the frontend's `/`, with bounded request timeouts.
+These are availability checks, not proof that Render has finished rolling
+out the requested SHA; confirm the image tag and deploy status in Render.
+
+PostgreSQL and the observability services are not upgraded here. In particular,
+changing a PostgreSQL major image tag on an existing data volume is not a
+safe upgrade. Compose currently uses PostgreSQL 17; verify the managed Render
+database's version separately and plan a backup/migration before changing it.
 
 Free Render web services sleep when idle, so the first request after a pause
 may take about 30 seconds. Free Render PostgreSQL databases expire after 30

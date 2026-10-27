@@ -39,15 +39,21 @@ jobs:
     steps:
       - name: Resolve image tag
         id: tag
-        run: echo "tag=${INPUT_TAG:-${RUN_SHA:-$GITHUB_SHA}}" >> "$GITHUB_OUTPUT"
+        run: |
+          tag="${INPUT_TAG:-${RUN_SHA:-$GITHUB_SHA}}"
+          if [[ ! "$tag" =~ ^[a-fA-F0-9]{40}$ ]]; then
+            echo "::error::image_tag must be a full 40-character commit SHA."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
         env:
           INPUT_TAG: ${{ inputs.image_tag }}
           RUN_SHA: ${{ github.event.workflow_run.head_sha }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         if: inputs.image_tag == ''
         with:
           ref: ${{ steps.tag.outputs.tag }}
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4.7.0
         if: inputs.image_tag == ''
         with:
           registry: ${{ env.REGISTRY }}
@@ -72,26 +78,16 @@ jobs:
     environment:
       name: development
       url: ${{ vars.DEV_WEB_URL }}
+    env:
+      TAG: ${{ needs.publish.outputs.tag }}
+      API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+      WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+      API_URL: ${{ vars.API_URL }}
+      WEB_URL: ${{ vars.DEV_WEB_URL }}
     steps:
-      - name: Trigger Render deploys
-        env:
-          TAG: ${{ needs.publish.outputs.tag }}
-          API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
-          WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
-        run: |
-          curl -fsS -X POST "$API_HOOK&imgURL=$IMAGE_PREFIX-backend:$TAG"
-          curl -fsS -X POST "$WEB_HOOK&imgURL=$IMAGE_PREFIX-frontend:$TAG"
-      - name: Wait for health check
-        env:
-          API_URL: ${{ vars.API_URL }}
-        run: |
-          sleep 60
-          for i in $(seq 1 40); do
-            curl -fsS "$API_URL/health" && exit 0
-            sleep 15
-          done
-          echo "Dev health check failed" >&2
-          exit 1
+      - uses: actions/checkout@v7.0.1
+      - name: Validate configuration, trigger Render deploys and check health
+        run: bash .github/scripts/deploy-render.sh
 
   deploy-prod:
     name: Deploy to production
@@ -100,23 +96,13 @@ jobs:
     environment:
       name: production
       url: ${{ vars.PROD_WEB_URL }}
+    env:
+      TAG: ${{ needs.publish.outputs.tag }}
+      API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+      WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+      API_URL: ${{ vars.API_URL }}
+      WEB_URL: ${{ vars.PROD_WEB_URL }}
     steps:
-      - name: Trigger Render deploys
-        env:
-          TAG: ${{ needs.publish.outputs.tag }}
-          API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
-          WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
-        run: |
-          curl -fsS -X POST "$API_HOOK&imgURL=$IMAGE_PREFIX-backend:$TAG"
-          curl -fsS -X POST "$WEB_HOOK&imgURL=$IMAGE_PREFIX-frontend:$TAG"
-      - name: Wait for health check
-        env:
-          API_URL: ${{ vars.API_URL }}
-        run: |
-          sleep 60
-          for i in $(seq 1 40); do
-            curl -fsS "$API_URL/health" && exit 0
-            sleep 15
-          done
-          echo "Production health check failed" >&2
-          exit 1
+      - uses: actions/checkout@v7.0.1
+      - name: Validate configuration, trigger Render deploys and check health
+        run: bash .github/scripts/deploy-render.sh

@@ -8,6 +8,7 @@ on:
       - "backend/**"
       - "frontend/**"
       - "migrations/**"
+      - "alembic.ini"
       - "docker-compose.yml"
       - ".github/workflows/docker.yml"
   workflow_dispatch:
@@ -24,6 +25,6 @@ jobs:
       matrix:
         service: [backend, frontend]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - name: Build image
         run: docker build -f ${{ matrix.service }}/Dockerfile -t expense-tracker-${{ matrix.service }}:ci .
