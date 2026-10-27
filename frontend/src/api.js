@@ -14,40 +14,55 @@ function formatApiError(detail, fallback) {
   return fallback;
 }
 
-async function request(path, options) {
-  const response = await fetch(`${API_BASE_URL}${path}`, options);
-  if (!response.ok) {
-    let detail;
-    try {
-      const body = await response.json();
-      detail = body.detail;
-    } catch (error) {
-      if (!(error instanceof SyntaxError)) {
-        throw error;
-      }
+// A sleeping free-tier backend can return gateway errors while it starts.
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 15000];
+// POST is excluded so a retry can never create duplicate transactions.
+const RETRYABLE_METHODS = new Set(["GET", "HEAD", "PUT", "DELETE"]);
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(path, options = {}) {
+  const method = (options.method ?? "GET").toUpperCase();
+  const delays = RETRYABLE_METHODS.has(method) ? RETRY_DELAYS_MS : [];
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(`${API_BASE_URL}${path}`, options);
+    if (!RETRYABLE_STATUSES.has(response.status) || attempt >= delays.length) {
+      return response;
     }
-    throw new Error(
-      formatApiError(detail, `The request failed (${response.status}).`),
-    );
+    await sleep(delays[attempt]);
+  }
+}
+
+async function throwResponseError(response) {
+  let detail;
+  try {
+    const body = await response.json();
+    detail = body.detail;
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      throw error;
+    }
+  }
+  throw new Error(
+    formatApiError(detail, `The request failed (${response.status}).`),
+  );
+}
+
+async function request(path, options) {
+  const response = await fetchWithRetry(path, options);
+  if (!response.ok) {
+    await throwResponseError(response);
   }
   return response.status === 204 ? null : response.json();
 }
 
 async function requestBlob(path) {
-  const response = await fetch(`${API_BASE_URL}${path}`);
+  const response = await fetchWithRetry(path);
   if (!response.ok) {
-    let detail;
-    try {
-      const body = await response.json();
-      detail = body.detail;
-    } catch (error) {
-      if (!(error instanceof SyntaxError)) {
-        throw error;
-      }
-    }
-    throw new Error(
-      formatApiError(detail, `The request failed (${response.status}).`),
-    );
+    await throwResponseError(response);
   }
   return response.blob();
 }

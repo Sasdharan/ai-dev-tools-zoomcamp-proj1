@@ -11,6 +11,20 @@ review them in a simple frontend, and move existing records in or out with CSV.
 The React/Vite frontend talks to a FastAPI backend. SQLite is available for
 local development, while Docker Compose runs the app with PostgreSQL.
 
+## Live demo
+
+The app is deployed on Render:
+
+- **App:** <https://ai-dev-tools-zoomcamp-proj1-web.onrender.com/>
+- **API docs (Swagger UI):** <https://ai-dev-tools-zoomcamp-proj1.onrender.com/docs>
+- **API health check:** <https://ai-dev-tools-zoomcamp-proj1.onrender.com/health>
+
+It runs on Render's free plan, so the first request after a quiet period can
+take about 30 seconds while the services wake up. The app retries
+automatically during that time. The demo database is shared, so please don't
+enter real personal data.
+![alt text](image.png)
+
 ## What it can do
 
 - Create, review, edit, and delete transactions in the frontend.
@@ -214,8 +228,9 @@ existing images to dev, and after approval to production. Render's
 
 ## Deployment (Render)
 
-- Dev: `<dev frontend URL>`
-- Production: `<production frontend URL>`
+- App: <https://ai-dev-tools-zoomcamp-proj1-web.onrender.com/>
+- API: <https://ai-dev-tools-zoomcamp-proj1.onrender.com/> (see `/docs` and
+  `/health`)
 
 The app runs on [Render](https://render.com) as Docker images pulled from
 GHCR. [`render.yaml`](render.yaml) defines dev and prod environments, each with
@@ -275,7 +290,10 @@ safe upgrade. Compose currently uses PostgreSQL 17; verify the managed Render
 database's version separately and plan a backup/migration before changing it.
 
 Free Render web services sleep when idle, so the first request after a pause
-may take about 30 seconds. Free Render PostgreSQL databases expire after 30
+may take about 30 seconds. While it wakes, the frontend retries GET, PUT and
+DELETE requests that return 502, 503 or 504 with backoff for about 30 seconds
+before showing an error; POST requests are not retried. Free Render
+PostgreSQL databases expire after 30
 days. The Grafana telemetry stack runs only with Docker Compose; on Render
 `OTEL_EXPORTER_OTLP_ENDPOINT` is unset and telemetry export is disabled.
 
